@@ -1,0 +1,6 @@
+{
+  "name": "Global CRM Space",
+  "description": "A CRM for managing customer pools by country, allowing sales reps to claim leads, track follow-ups (WhatsApp, Email, Call), and automatically recycle unworked leads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
