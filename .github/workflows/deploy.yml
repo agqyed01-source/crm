@@ -34,10 +34,12 @@ jobs:
           SOURCE: ""
           REMOTE_HOST: ${{ secrets.SERVER_HOST }}
           REMOTE_USER: ${{ secrets.SERVER_USER }}
-          TARGET: "/var/www/my-crm-app" # Replace with the actual path on your VPS
+          TARGET: "/opt/1panel/www/sites/crm" # Changed to requested directory
           EXCLUDE: "/.git/, /.github/, /node_modules/, /src/"
+          SCRIPT_BEFORE: |
+            mkdir -p /opt/1panel/www/sites/crm
           SCRIPT_AFTER: |
-            cd /var/www/my-crm-app
+            cd /opt/1panel/www/sites/crm
             npm install --omit=dev
             # Install PM2 globally if not exists, then start/restart the server on port 3002
             npm install -g pm2
