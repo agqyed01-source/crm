@@ -9,8 +9,16 @@ const app = express();
 const PORT = 3000;
 const SECRET = process.env.JWT_SECRET || "fallback-secret-key-do-not-use-in-prod";
 
+import fs from 'fs';
+
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+  const line = `[DEBUG] ${new Date().toISOString()} ${req.method} ${req.url}\n`;
+  fs.appendFileSync('requests.log', line);
+  next();
+});
 
 // Initialize SQLite
 const db = new Database('database.sqlite');

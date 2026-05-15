@@ -56,7 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const loginWithEmail = async (email: string, pass: string) => {
-    const res = await fetch('/api/auth/login', {
+    const url = '/api/auth/login';
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
@@ -68,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       data = await res.json();
     } else {
       const text = await res.text();
-      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      throw new Error(`Server error: ${res.status} ${res.statusText}\nURL: ${new URL(url, window.location.href).href}\n${text.substring(0, 100)}`);
     }
 
     if (!res.ok) throw new Error(data.error || 'Login failed');
@@ -79,7 +80,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signupWithEmail = async (email: string, pass: string, name: string) => {
-    const res = await fetch('/api/auth/register', {
+    const url = '/api/auth/register';
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass, name })
@@ -91,7 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       data = await res.json();
     } else {
       const text = await res.text();
-      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      throw new Error(`Server error: ${res.status} ${res.statusText}\nURL: ${new URL(url, window.location.href).href}\n${text.substring(0, 100)}`);
     }
 
     if (!res.ok) throw new Error(data.error || 'Registration failed');
