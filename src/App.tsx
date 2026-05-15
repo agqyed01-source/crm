@@ -19,9 +19,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { useAuth } from './AuthContext';
 import Login from './Login';
-import { db } from './firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from './firebaseUtils';
 
 type Customer = {
   id: string;
@@ -46,12 +43,25 @@ type AppUser = {
 };
 
 const ALL_COUNTRIES = [
-  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "USA", "Uganda", "UK", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "USA", "Uganda", "UK", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
 ];
 
 function generateId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
+
+const fetchApi = async (url: string, method = 'GET', body: any = null) => {
+  const headers: any = {};
+  const token = localStorage.getItem('token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  if (body) headers['Content-Type'] = 'application/json';
+  
+  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : null });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'API Error');
+  return data;
+};
 
 export default function App() {
   const { user, role, loading, logout } = useAuth();
@@ -59,6 +69,7 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [appUsers, setAppUsers] = useState<AppUser[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const [dashboardImportOpen, setDashboardImportOpen] = useState(false);
   const [poolImportOpen, setPoolImportOpen] = useState(false);
@@ -66,27 +77,37 @@ export default function App() {
   const [countrySearch, setCountrySearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
+  const [actionState, setActionState] = useState<{
+    type: 'contact' | 'status' | 'view';
+    lead: Customer | null;
+    contactMethod?: 'whatsapp' | 'email';
+  } | null>(null);
+  
+  const [note, setNote] = useState('');
+  const [newStatus, setNewStatus] = useState<Customer['status']>('Following Up');
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (actionState?.lead && actionState.type === 'view') {
+       fetchApi(`/api/customers/${actionState.lead.id}/history`)
+         .then(setHistoryRecords)
+         .catch(console.error);
+    }
+  }, [actionState?.lead, actionState?.type]);
+
   useEffect(() => {
     if (!user) return;
     
-    const unsubscribeCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data() as Customer);
-      setCustomers(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, "customers"));
+    fetchApi('/api/customers')
+      .then(res => setCustomers(res.customers))
+      .catch(console.error);
 
-    let unsubscribeUsers = () => {};
     if (role === 'admin' || role === 'manager') {
-       unsubscribeUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-         const data = snapshot.docs.map(d => d.data() as AppUser);
-         setAppUsers(data);
-       }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+       fetchApi('/api/users')
+         .then(res => setAppUsers(res))
+         .catch(console.error);
     }
-
-    return () => {
-      unsubscribeCustomers();
-      unsubscribeUsers();
-    };
-  }, [user, role]);
+  }, [user, role, refreshTrigger]);
 
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   if (!user) return <Login />;
@@ -110,16 +131,14 @@ export default function App() {
           return typeof val === 'string' ? val.trim() : val;
         };
 
-        const batch = writeBatch(db);
-        let count = 0;
         const now = Date.now();
+        const batchCustomers: Customer[] = [];
 
         for (let i = 0; i < results.data.length; i++) {
           const row = results.data[i];
           const cId = generateId();
-          const docRef = doc(db, 'customers', cId);
           
-          const newCustomer: Customer = {
+          batchCustomers.push({
             id: cId,
             name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
             company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
@@ -129,24 +148,19 @@ export default function App() {
             status: 'In Pool',
             createdAt: now,
             updatedAt: now
-          };
-          
-          batch.set(docRef, newCustomer);
-          count++;
-          if (count === 490) { // Batch limit is 500
-             await batch.commit().catch(e => console.error("Batch error", e));
-             count = 0;
-          }
+          });
         }
         
-        if (count > 0) {
-          await batch.commit().catch(e => console.error("Batch error", e));
+        if (batchCustomers.length > 0) {
+           await fetchApi('/api/customers/import', 'POST', batchCustomers)
+             .catch(e => alert("Import error: " + e.message));
         }
 
         setSelectedFile(null);
         setDashboardImportOpen(false);
         setPoolImportOpen(false);
         setActiveTab('public-pool');
+        setRefreshTrigger(p => p + 1);
       },
       error: (error: Error) => {
         alert("Error parsing CSV: " + error.message);
@@ -156,29 +170,91 @@ export default function App() {
 
   const handleClaim = async (leadId: string) => {
     try {
-      const now = Date.now();
-      await updateDoc(doc(db, 'customers', leadId), {
-        status: 'Following Up',
-        salesRepId: user.uid,
-        updatedAt: now,
-        lastFollowUp: 'Just now'
+      const hId = generateId();
+      await fetchApi(`/api/customers/${leadId}`, 'PUT', {
+         status: 'Following Up',
+         salesRepId: user?.uid,
+         lastFollowUp: 'Just now'
       });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, `customers/${leadId}`);
+      
+      await fetchApi(`/api/customers/${leadId}/history`, 'POST', {
+         id: hId,
+         type: 'status_change',
+         oldStatus: 'In Pool',
+         newStatus: 'Following Up',
+         note: 'Claimed lead from public pool'
+      });
+      setRefreshTrigger(p => p + 1);
+    } catch (e: any) {
+      alert("Error: " + e.message);
     }
   };
 
   const handleChangeUserRole = async (uid: string, newRole: string) => {
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        role: newRole,
-        updatedAt: Date.now()
-      });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, `users/${uid}`);
+      await fetchApi(`/api/users/${uid}/role`, 'PUT', { role: newRole });
+      setRefreshTrigger(p => p + 1);
+    } catch (e: any) {
+      alert("Error: " + e.message);
     }
   };
   
+  const handleLogContact = async () => {
+    if (!actionState || !actionState.lead || !user) return;
+    const hId = generateId();
+    
+    try {
+      await fetchApi(`/api/customers/${actionState.lead.id}/history`, 'POST', {
+         id: hId,
+         type: 'contact',
+         note: note,
+         contactMethod: actionState.contactMethod
+      });
+      
+      await fetchApi(`/api/customers/${actionState.lead.id}`, 'PUT', {
+         lastFollowUp: 'Just now'
+      });
+      
+      if (actionState.contactMethod === 'whatsapp') {
+         window.open(`https://wa.me/${actionState.lead.phone.replace(/[^0-9]/g, '')}`, '_blank');
+      } else {
+         window.open(`mailto:${actionState.lead.email}`, '_blank');
+      }
+      
+      setActionState(null);
+      setNote('');
+      setRefreshTrigger(p => p + 1);
+    } catch(e: any) {
+      alert("Error logging contact: " + e.message);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!actionState || !actionState.lead || !user) return;
+    const hId = generateId();
+    
+    try {
+      await fetchApi(`/api/customers/${actionState.lead.id}/history`, 'POST', {
+         id: hId,
+         type: 'status_change',
+         oldStatus: actionState.lead.status,
+         newStatus: newStatus,
+         note: note
+      });
+      
+      await fetchApi(`/api/customers/${actionState.lead.id}`, 'PUT', {
+         status: newStatus,
+         ...(newStatus === 'In Pool' ? { salesRepId: null } : {})
+      });
+      
+      setActionState(null);
+      setNote('');
+      setRefreshTrigger(p => p + 1);
+    } catch(e: any) {
+      alert("Error updating status: " + e.message);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-neutral-100 dark:bg-neutral-900">
       {/* Sidebar */}
@@ -347,14 +423,23 @@ export default function App() {
                         <TableCell className="text-right">
                            <DropdownMenu>
                               <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "gap-2" })}>
-                                Contact <MoreVertical className="w-3 h-3" />
+                                Actions <MoreVertical className="w-3 h-3" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => window.open(`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`, '_blank')}>
+                                <DropdownMenuLabel>Contact</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'whatsapp' }); }}>
                                   <MessageCircle className="w-4 h-4 mr-2 text-green-500" /> WhatsApp
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(`mailto:${lead.email}`, '_blank')}>
+                                <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'email' }); }}>
                                   <Mail className="w-4 h-4 mr-2 text-orange-500" /> Email
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => { setNote(''); setNewStatus(lead.status); setActionState({ type: 'status', lead }); }}>
+                                  Change Status
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setActionState({ type: 'view', lead })}>
+                                  View History
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -483,8 +568,9 @@ export default function App() {
                                 <Badge variant="outline">{customer.country}</Badge>
                               </div>
                             </CardHeader>
-                            <CardContent>
-                              <Button className="w-full mt-4" onClick={() => handleClaim(customer.id)}>Claim Lead</Button>
+                            <CardContent className="flex flex-col gap-2">
+                              <Button className="w-full mt-2 lg:mt-4" onClick={() => handleClaim(customer.id)}>Claim Lead</Button>
+                              <Button className="w-full" variant="outline" onClick={() => setActionState({ type: 'view', lead: customer })}>View History</Button>
                             </CardContent>
                           </Card>
                         ))}
@@ -518,7 +604,10 @@ export default function App() {
                                <Badge variant='secondary'>{lead.status}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" onClick={() => handleClaim(lead.id)}>Claim</Button>
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setActionState({ type: 'view', lead })}>Details</Button>
+                                <Button size="sm" onClick={() => handleClaim(lead.id)}>Claim</Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -591,6 +680,108 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Dialogs */}
+      <Dialog open={actionState?.type === 'contact'} onOpenChange={(open) => !open && setActionState(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log Communication ({actionState?.contactMethod === 'whatsapp' ? 'WhatsApp' : 'Email'})</DialogTitle>
+            <DialogDescription>
+              Write down the purpose of this contact. A history record will be permanently saved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Note / Purpose</Label>
+            <textarea 
+              className="flex min-h-[100px] mt-2 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+              placeholder="e.g. Sent introduction email along with catalog..."
+              value={note}
+              onChange={e => setNote(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionState(null)}>Cancel</Button>
+            <Button disabled={!note.trim()} onClick={handleLogContact}>Save & Open</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={actionState?.type === 'status'} onOpenChange={(open) => !open && setActionState(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Lead Status</DialogTitle>
+            <DialogDescription>
+              Update the status of {actionState?.lead?.name} and leave a note.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>New Status</Label>
+              <Select value={newStatus} onValueChange={(val: any) => setNewStatus(val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Following Up">Following Up</SelectItem>
+                  <SelectItem value="Negotiating">Negotiating</SelectItem>
+                  <SelectItem value="Closed">Deal Closed</SelectItem>
+                  <SelectItem value="In Pool">Return to Public Pool</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reason / Note</Label>
+              <textarea 
+                className="flex min-h-[100px] mt-2 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
+                placeholder="Why is the status changing?"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionState(null)}>Cancel</Button>
+            <Button disabled={!note.trim() || newStatus === actionState?.lead?.status} onClick={handleUpdateStatus}>Save Status</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={actionState?.type === 'view'} onOpenChange={(open) => !open && setActionState(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Customer Details: {actionState?.lead?.name}</DialogTitle>
+            <DialogDescription>
+              {actionState?.lead?.company} • {actionState?.lead?.country} • {actionState?.lead?.status}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto py-4 pr-1">
+             <h4 className="font-semibold mb-4 text-lg">History Logs</h4>
+             <div className="space-y-4">
+                {historyRecords.length === 0 ? (
+                   <p className="text-muted-foreground text-sm">No history records found.</p>
+                ) : (
+                   historyRecords.map(record => (
+                     <Card key={record.id} className="bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 shadow-none">
+                       <CardContent className="p-4 flex flex-col gap-2">
+                         <div className="flex justify-between items-start">
+                           <div className="flex items-center gap-2">
+                             <Badge variant="outline">
+                               {record.type === 'contact' ? 'Contact' : 'Status Change'}
+                             </Badge>
+                             {record.type === 'contact' && <span className="text-sm font-medium capitalize">{record.contactMethod}</span>}
+                             {record.type === 'status_change' && <span className="text-sm font-medium">{record.oldStatus} → {record.newStatus}</span>}
+                           </div>
+                           <span className="text-xs text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</span>
+                         </div>
+                         <p className="text-sm mt-2 whitespace-pre-wrap">{record.note}</p>
+                       </CardContent>
+                     </Card>
+                   ))
+                )}
+             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
