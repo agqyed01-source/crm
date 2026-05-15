@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || "fallback-secret-key-do-not-use-in-prod";
 
 import fs from 'fs';

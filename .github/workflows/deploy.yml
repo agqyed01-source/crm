@@ -53,8 +53,9 @@ jobs:
             fi
             
             npm install --omit=dev
-            # Install PM2 globally if not exists, then start/restart the server on port 3002
+            # Install PM2 globally if not exists, then start/restart the server
             npm install -g pm2
-            pm2 start server.js --name "my-crm-app" || pm2 restart "my-crm-app"
+            pm2 delete "my-crm-app" || true
+            PORT=3002 pm2 start dist/server.cjs --name "my-crm-app"
             pm2 save
 
