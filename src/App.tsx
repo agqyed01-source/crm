@@ -58,7 +58,15 @@ const fetchApi = async (url: string, method = 'GET', body: any = null) => {
   if (body) headers['Content-Type'] = 'application/json';
   
   const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : null });
-  const data = await res.json();
+  
+  let data;
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    data = await res.json();
+  } else {
+    throw new Error(`Server error: ${res.status} ${res.statusText}`);
+  }
+  
   if (!res.ok) throw new Error(data.error || 'API Error');
   return data;
 };

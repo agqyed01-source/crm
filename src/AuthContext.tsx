@@ -61,8 +61,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    
+    let data;
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+    }
+
+    if (!res.ok) throw new Error(data.error || 'Login failed');
     
     localStorage.setItem('token', data.token);
     setUser(data.user);
@@ -75,8 +84,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass, name })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    
+    let data;
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
+    }
+
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
     
     localStorage.setItem('token', data.token);
     setUser(data.user);
