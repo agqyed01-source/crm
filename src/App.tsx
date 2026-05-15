@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import { 
   Building2, 
@@ -50,14 +50,25 @@ const MOCK_CUSTOMERS: Customer[] = [
   { id: "5", name: "Aisha Patel", company: "Mumbai Services", country: "India", phone: "+91 98765 43210", email: "aisha@mumbaiserv.in", status: 'Claimed', salesRepId: 'other', lastFollowUp: '6 days ago' },
 ];
 
-const ALL_COUNTRIES = [
-  "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "USA", "Uganda", "UK", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
-];
-
 export default function App() {
   const [activeTab, setActiveTab] = useState("my-leads");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>(() => {
+    const saved = localStorage.getItem('crm-customers');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to load customers from local storage", e);
+        return MOCK_CUSTOMERS;
+      }
+    }
+    return MOCK_CUSTOMERS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm-customers', JSON.stringify(customers));
+  }, [customers]);
   const [dashboardImportOpen, setDashboardImportOpen] = useState(false);
   const [poolImportOpen, setPoolImportOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
@@ -74,13 +85,22 @@ export default function App() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const newCustomers: Customer[] = results.data.map((row: any, index) => ({
-          id: `imported-${Date.now()}-${index}`,
-          name: row.Name || row.name || Object.values(row)[0] || 'Unknown',
-          company: row.Company || row.company || Object.values(row)[1] || 'Unknown Company',
-          country: row.Country || row.country || row.region || Object.values(row)[2] || 'Unknown Country',
-          phone: row.Phone || row.phone || row['Phone Number'] || row.mobile || '',
-          email: row.Email || row.email || '',
+        const getVal = (row: any, keywords: string[], index?: number) => {
+          const key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
+          let val = key ? row[key] : undefined;
+          if (!val && index !== undefined) {
+             val = Object.values(row)[index];
+          }
+          return typeof val === 'string' ? val.trim() : val;
+        };
+
+        const newCustomers: Customer[] = results.data.map((row: any, i) => ({
+          id: `imported-${Date.now()}-${i}`,
+          name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
+          company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
+          country: getVal(row, ['country', 'region', '收货国家'], 3) || 'Unknown Country',
+          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || getVal(row, [], 9) || '',
+          email: getVal(row, ['email', '联系邮箱'], 8) || '',
           status: 'In Pool'
         }));
         setCustomers(prev => [...prev, ...newCustomers]);
@@ -393,10 +413,11 @@ export default function App() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {!selectedCountry ? (
-                  ALL_COUNTRIES
+                  Array.from(new Set(publicPool.map(c => c.country)))
                     .filter(c => c.toLowerCase().includes(countrySearch.toLowerCase()))
+                    .sort((a, b) => a.localeCompare(b))
                     .map(country => {
-                    const count = publicPool.filter(c => c.country.toLowerCase() === country.toLowerCase()).length;
+                    const count = publicPool.filter(c => c.country === country).length;
                     return (
                       <Card key={country} className="cursor-pointer hover:border-blue-500 transition-colors" onClick={() => setSelectedCountry(country)}>
                         <CardHeader className="pb-4">
@@ -404,7 +425,7 @@ export default function App() {
                             <CardTitle className="text-xl flex items-center gap-2">
                               {country}
                             </CardTitle>
-                            <Badge variant={count > 0 ? "default" : "secondary"} className={`text-lg px-3 py-1 ${count > 0 ? "bg-blue-600 hover:bg-blue-700" : ""}`}>
+                            <Badge variant="default" className="text-lg px-3 py-1 bg-blue-600 hover:bg-blue-700">
                               {count}
                             </Badge>
                           </div>
