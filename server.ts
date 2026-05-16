@@ -1,28 +1,30 @@
 import express from "express";
 import path from "path";
-import Database from "better-sqlite3";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import fs from 'fs';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.JWT_SECRET || "fallback-secret-key-do-not-use-in-prod";
 
-import fs from 'fs';
-
 app.use(cors());
 app.use(express.json());
 
-app.use((req, res, next) => {
-  const line = `[DEBUG] ${new Date().toISOString()} ${req.method} ${req.url}\n`;
-  fs.appendFileSync('requests.log', line);
-  next();
-});
-
 // Initialize SQLite
-const db = new Database('database.sqlite');
-db.pragma('journal_mode = WAL');
+let db: any;
+try {
+  console.log('[DEBUG] Initializing database...');
+  // Interop for different environments/builders
+  const DatabaseConstructor = require("better-sqlite3");
+  db = new DatabaseConstructor('database.sqlite');
+  db.pragma('journal_mode = WAL');
+  console.log('[DEBUG] Database initialized successfully.');
+} catch (error: any) {
+  console.error('[ERROR] Failed to initialize database:', error);
+  process.exit(1);
+}
 
 // Migrations
 db.exec(`

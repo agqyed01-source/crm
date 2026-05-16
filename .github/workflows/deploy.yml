@@ -53,9 +53,16 @@ jobs:
             fi
             
             npm install --omit=dev
+            # Ensure native modules are built for this architecture
+            npm rebuild better-sqlite3 || true
+            
             # Install PM2 globally if not exists, then start/restart the server
-            npm install -g pm2
+            npm install -g pm2 || true
+            
+            # Reload environment for PM2
+            export PATH=$PATH:$(npm config get prefix)/bin
+            
             pm2 delete "my-crm-app" || true
-            PORT=3002 pm2 start dist/server.cjs --name "my-crm-app"
+            NODE_ENV=production PORT=3002 pm2 start dist/server.cjs --name "my-crm-app" --node-args="--enable-source-maps"
             pm2 save
 
