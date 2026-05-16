@@ -137,10 +137,11 @@ export default function App() {
       const getVal = (row: any, keywords: string[], index?: number) => {
         const key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
         let val = key ? row[key] : undefined;
-        if (!val && index !== undefined) {
+        if ((val === undefined || val === '') && index !== undefined) {
            val = Object.values(row)[index];
         }
-        return typeof val === 'string' ? val.trim() : val;
+        if (val === undefined || val === null) return '';
+        return String(val).replace(/\.0$/, '').trim();
       };
 
       const now = Date.now();
@@ -151,19 +152,24 @@ export default function App() {
         if (!row || Object.keys(row).length === 0) continue;
         const cId = generateId();
         
+        // Use Address field (index 1) and optionally append Address 2 (index 5)
+        const addr1 = getVal(row, ['收货地址', 'address'], 1);
+        const addr2 = getVal(row, ['地址', 'address2'], 5);
+        const fullAddress = [addr1, addr2].filter(Boolean).join(' ');
+
         batchCustomers.push({
           id: cId,
-          name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
-          company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
-          address: getVal(row, ['address', '收货地址'], 1) || '',
-          state: getVal(row, ['state', 'province', '州/省'], 4) || '',
-          city: getVal(row, ['city', '城市'], 5) || '',
-          zip: getVal(row, ['zip', 'postal', '邮编'], 7) || '',
-          countryCode: getVal(row, ['country code', '国家区号'], 9) || '',
-          taxId: getVal(row, ['tax', '税号'], 11) || '',
-          country: getVal(row, ['country', 'region', '收货国家'], 3) || 'Unknown Country',
-          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || '',
-          email: getVal(row, ['email', '联系邮箱'], 8) || '',
+          name: getVal(row, ['name', '收件人名', '买家名称'], 0) || 'Unknown',
+          company: getVal(row, ['company'], -1) || 'Unknown Company',
+          address: fullAddress,
+          state: getVal(row, ['state', 'province', '州/省'], 3) || '',
+          city: getVal(row, ['city', '城市'], 4) || '',
+          zip: getVal(row, ['zip', 'postal', '邮编'], 6) || '',
+          countryCode: getVal(row, ['country code', '国家区号', '区号'], 8) || '',
+          taxId: getVal(row, ['tax', '税号'], 10) || '',
+          country: getVal(row, ['country', 'region', '收货国家', '国家'], 2) || 'Unknown Country',
+          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话', '电话'], 9) || '',
+          email: getVal(row, ['email', '邮件', '邮箱'], 7) || '',
           status: 'In Pool',
           createdAt: now,
           updatedAt: now
