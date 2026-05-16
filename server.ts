@@ -11,7 +11,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const SECRET = process.env.JWT_SECRET || "fallback-secret-key-do-not-use-in-prod";
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Initialize SQLite
 let db: Database.Database;
