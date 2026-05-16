@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { 
   Building2, Users, Globe2, MessageCircle, Mail, PhoneCall,
   LogOut, LayoutDashboard, Settings, MoreVertical, Plus, Upload, 
@@ -126,54 +127,75 @@ export default function App() {
   const handleImport = () => {
     if (!selectedFile) return;
 
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const getVal = (row: any, keywords: string[], index?: number) => {
-          const key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
-          let val = key ? row[key] : undefined;
-          if (!val && index !== undefined) {
-             val = Object.values(row)[index];
-          }
-          return typeof val === 'string' ? val.trim() : val;
-        };
-
-        const now = Date.now();
-        const batchCustomers: Customer[] = [];
-
-        for (let i = 0; i < results.data.length; i++) {
-          const row = results.data[i];
-          const cId = generateId();
-          
-          batchCustomers.push({
-            id: cId,
-            name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
-            company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
-            country: getVal(row, ['country', 'region', '收货国家'], 3) || 'Unknown Country',
-            phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || getVal(row, [], 9) || '',
-            email: getVal(row, ['email', '联系邮箱'], 8) || '',
-            status: 'In Pool',
-            createdAt: now,
-            updatedAt: now
-          });
+    const processData = async (data: any[]) => {
+      const getVal = (row: any, keywords: string[], index?: number) => {
+        const key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
+        let val = key ? row[key] : undefined;
+        if (!val && index !== undefined) {
+           val = Object.values(row)[index];
         }
+        return typeof val === 'string' ? val.trim() : val;
+      };
+
+      const now = Date.now();
+      const batchCustomers: Customer[] = [];
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        if (!row || Object.keys(row).length === 0) continue;
+        const cId = generateId();
         
-        if (batchCustomers.length > 0) {
-           await fetchApi('/api/customers/import', 'POST', batchCustomers)
-             .catch(e => alert("Import error: " + e.message));
-        }
-
-        setSelectedFile(null);
-        setDashboardImportOpen(false);
-        setPoolImportOpen(false);
-        setActiveTab('public-pool');
-        setRefreshTrigger(p => p + 1);
-      },
-      error: (error: Error) => {
-        alert("Error parsing CSV: " + error.message);
+        batchCustomers.push({
+          id: cId,
+          name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
+          company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
+          country: getVal(row, ['country', 'region', '收货国家'], 3) || 'Unknown Country',
+          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || getVal(row, [], 9) || '',
+          email: getVal(row, ['email', '联系邮箱'], 8) || '',
+          status: 'In Pool',
+          createdAt: now,
+          updatedAt: now
+        });
       }
-    });
+      
+      if (batchCustomers.length > 0) {
+         await fetchApi('/api/customers/import', 'POST', batchCustomers)
+           .catch(e => alert("Import error: " + e.message));
+      }
+
+      setSelectedFile(null);
+      setDashboardImportOpen(false);
+      setPoolImportOpen(false);
+      setActiveTab('public-pool');
+      setRefreshTrigger(p => p + 1);
+    };
+
+    if (selectedFile.name.toLowerCase().endsWith('.csv')) {
+      Papa.parse(selectedFile, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => processData(results.data),
+        error: (error: Error) => {
+          alert("Error parsing CSV: " + error.message);
+        }
+      });
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+          processData(json);
+        } catch (error: any) {
+          alert("Error parsing Excel file: " + error.message);
+        }
+      };
+      reader.onerror = () => alert("Error reading file");
+      reader.readAsArrayBuffer(selectedFile);
+    }
   };
 
   const handleClaim = async (leadId: string) => {
@@ -536,7 +558,13 @@ export default function App() {
                       ALL_COUNTRIES
                         .filter(c => c.toLowerCase().includes(countrySearch.toLowerCase()))
                         .map(country => {
-                        const count = publicPool.filter(c => c.country.toLowerCase() === country.toLowerCase()).length;
+                        const isMatch = (c: any) => {
+                          if (!c.country) return false;
+                          const c1 = c.country.replace(/[^a-zA-Z]/g, '').toLowerCase();
+                          const c2 = country.replace(/[^a-zA-Z]/g, '').toLowerCase();
+                          return c1 === c2 || c1.startsWith(c2) || c2.startsWith(c1);
+                        };
+                        const count = publicPool.filter(isMatch).length;
                         return (
                           <Card key={country} className="cursor-pointer hover:border-blue-500 transition-colors" onClick={() => setSelectedCountry(country)}>
                             <CardHeader className="pb-4">
@@ -565,7 +593,12 @@ export default function App() {
                           </Button>
                           <h3 className="text-lg font-semibold">{selectedCountry} Leads</h3>
                         </div>
-                        {publicPool.filter(c => c.country.toLowerCase() === selectedCountry.toLowerCase()).map(customer => (
+                        {publicPool.filter(c => {
+                          if (!c.country) return false;
+                          const c1 = c.country.replace(/[^a-zA-Z]/g, '').toLowerCase();
+                          const c2 = selectedCountry.replace(/[^a-zA-Z]/g, '').toLowerCase();
+                          return c1 === c2 || c1.startsWith(c2) || c2.startsWith(c1);
+                        }).map(customer => (
                           <Card key={customer.id}>
                             <CardHeader className="pb-2">
                               <div className="flex justify-between items-start">
@@ -599,7 +632,7 @@ export default function App() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {publicPool.filter(c => c.country.toLowerCase().includes(countrySearch.toLowerCase())).map(lead => (
+                        {publicPool.filter(c => (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())).map(lead => (
                           <TableRow key={lead.id}>
                             <TableCell>
                               <div className="font-medium">{lead.name}</div>
