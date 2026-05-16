@@ -134,12 +134,15 @@ export default function App() {
     if (!selectedFile) return;
 
     const processData = async (data: any[]) => {
-      const getVal = (row: any, keywords: string[], index?: number) => {
-        const key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase())));
-        let val = key ? row[key] : undefined;
-        if ((val === undefined || val === '') && index !== undefined) {
-           val = Object.values(row)[index];
+      const getVal = (row: any, keywords: string[]) => {
+        // Try strict exact match first
+        let key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().trim() === kw.toLowerCase().trim()));
+        // Try substring match if no exact match
+        if (!key) {
+           key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase().trim())));
         }
+        
+        let val = key ? row[key] : undefined;
         if (val === undefined || val === null) return '';
         return String(val).replace(/\.0$/, '').trim();
       };
@@ -152,24 +155,23 @@ export default function App() {
         if (!row || Object.keys(row).length === 0) continue;
         const cId = generateId();
         
-        // Use Address field (index 1) and optionally append Address 2 (index 5)
-        const addr1 = getVal(row, ['收货地址', 'address'], 1);
-        const addr2 = getVal(row, ['地址', 'address2'], 5);
+        const addr1 = getVal(row, ['收货地址', 'address1', 'street']);
+        const addr2 = getVal(row, ['地址', 'address2']);
         const fullAddress = [addr1, addr2].filter(Boolean).join(' ');
 
         batchCustomers.push({
           id: cId,
-          name: getVal(row, ['name', '收件人名', '买家名称'], 0) || 'Unknown',
-          company: getVal(row, ['company'], -1) || 'Unknown Company',
+          name: getVal(row, ['收件人名称', '收件人名', 'name', '买家名称']) || 'Unknown',
+          company: getVal(row, ['company', '公司']) || 'Unknown Company',
           address: fullAddress,
-          state: getVal(row, ['state', 'province', '州/省'], 3) || '',
-          city: getVal(row, ['city', '城市'], 4) || '',
-          zip: getVal(row, ['zip', 'postal', '邮编'], 6) || '',
-          countryCode: getVal(row, ['country code', '国家区号', '区号'], 8) || '',
-          taxId: getVal(row, ['tax', '税号'], 10) || '',
-          country: getVal(row, ['country', 'region', '收货国家', '国家'], 2) || 'Unknown Country',
-          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话', '电话'], 9) || '',
-          email: getVal(row, ['email', '邮件', '邮箱'], 7) || '',
+          state: getVal(row, ['州/省', 'state', 'province']) || '',
+          city: getVal(row, ['城市', 'city']) || '',
+          zip: getVal(row, ['邮编', 'zip', 'postal']) || '',
+          countryCode: getVal(row, ['国家区号', 'country code', '区号']) || '',
+          taxId: getVal(row, ['税号', 'tax', 'tax id']) || '',
+          country: getVal(row, ['收货国家', '国家', 'country', 'region']) || 'Unknown Country',
+          phone: getVal(row, ['联系电话', '手机', '电话', 'phone', 'mobile']) || '',
+          email: getVal(row, ['联系邮件', '邮箱', '邮件', 'email']) || '',
           status: 'In Pool',
           createdAt: now,
           updatedAt: now
