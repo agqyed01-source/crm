@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { 
   Building2, Users, Globe2, MessageCircle, Mail, PhoneCall,
   LogOut, LayoutDashboard, Settings, MoreVertical, Plus, Upload, 
-  FileSpreadsheet, Shield
+  FileSpreadsheet, Shield, MessageSquare
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,7 +95,7 @@ export default function App() {
   const [actionState, setActionState] = useState<{
     type: 'contact' | 'status' | 'view';
     lead: Customer | null;
-    contactMethod?: 'whatsapp' | 'email';
+    contactMethod?: 'whatsapp' | 'email' | 'sms' | 'call';
   } | null>(null);
   
   const [note, setNote] = useState('');
@@ -264,9 +264,13 @@ export default function App() {
       });
       
       if (actionState.contactMethod === 'whatsapp') {
-         window.open(`https://wa.me/${actionState.lead.phone.replace(/[^0-9]/g, '')}`, '_blank');
-      } else {
+         window.open(`https://wa.me/${(actionState.lead.phone || '').replace(/[^0-9]/g, '')}`, '_blank');
+      } else if (actionState.contactMethod === 'email') {
          window.open(`mailto:${actionState.lead.email}`, '_blank');
+      } else if (actionState.contactMethod === 'sms') {
+         window.open(`sms:${(actionState.lead.phone || '').replace(/[^0-9+]/g, '')}`, '_self');
+      } else if (actionState.contactMethod === 'call') {
+         window.open(`tel:${(actionState.lead.phone || '').replace(/[^0-9+]/g, '')}`, '_self');
       }
       
       setActionState(null);
@@ -452,14 +456,21 @@ export default function App() {
                       <TableHead>Customer</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Auto-Release</TableHead>
                       <TableHead className="text-right">Quick Contact</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {myLeads.map(lead => (
+                    {myLeads.map(lead => {
+                      // Calculate days until auto-release (e.g., 7 days limit)
+                      const CLAIM_PERIOD_DAYS = 7;
+                      const timeElapsed = Date.now() - (lead.updatedAt || lead.createdAt);
+                      const daysElapsed = Math.floor(timeElapsed / (1000 * 60 * 60 * 24));
+                      const daysLeft = Math.max(0, CLAIM_PERIOD_DAYS - daysElapsed);
+                      return (
                       <TableRow key={lead.id}>
                         <TableCell>
-                          <div className="font-medium">{lead.name}</div>
+                          <div className="font-medium cursor-pointer text-blue-600 hover:underline" onClick={() => setActionState({ type: 'view', lead })}>{lead.name}</div>
                           <div className="text-sm text-muted-foreground">{lead.company} | Last: {lead.lastFollowUp || 'N/A'}</div>
                         </TableCell>
                         <TableCell>
@@ -468,18 +479,26 @@ export default function App() {
                         <TableCell>
                            <Badge variant={lead.status === 'Following Up' ? 'default' : 'secondary'}>{lead.status}</Badge>
                         </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {daysLeft} days left
+                        </TableCell>
                         <TableCell className="text-right">
                            <DropdownMenu>
                               <DropdownMenuTrigger className={buttonVariants({ variant: "outline", size: "sm", className: "gap-2" })}>
-                                Actions <MoreVertical className="w-3 h-3" />
+                                Contact <MoreVertical className="w-3 h-3" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Contact</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'whatsapp' }); }}>
                                   <MessageCircle className="w-4 h-4 mr-2 text-green-500" /> WhatsApp
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'sms' }); }}>
+                                  <MessageSquare className="w-4 h-4 mr-2 text-blue-400" /> SMS
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'email' }); }}>
                                   <Mail className="w-4 h-4 mr-2 text-orange-500" /> Email
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setNote(''); setActionState({ type: 'contact', lead, contactMethod: 'call' }); }}>
+                                  <PhoneCall className="w-4 h-4 mr-2 text-neutral-500" /> Call
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => { setNote(''); setNewStatus(lead.status); setActionState({ type: 'status', lead }); }}>
@@ -487,13 +506,13 @@ export default function App() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => setActionState({ type: 'view', lead })}>
-                                  View History
+                                  View Details
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                     {myLeads.length === 0 && (
                        <TableRow>
                           <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm">
@@ -744,7 +763,13 @@ export default function App() {
       <Dialog open={actionState?.type === 'contact'} onOpenChange={(open) => !open && setActionState(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Log Communication ({actionState?.contactMethod === 'whatsapp' ? 'WhatsApp' : 'Email'})</DialogTitle>
+            <DialogTitle>
+              Log Communication ({
+                actionState?.contactMethod === 'whatsapp' ? 'WhatsApp' : 
+                actionState?.contactMethod === 'sms' ? 'SMS' : 
+                actionState?.contactMethod === 'call' ? 'Phone Call' : 'Email'
+              })
+            </DialogTitle>
             <DialogDescription>
               Write down the purpose of this contact. A history record will be permanently saved.
             </DialogDescription>
