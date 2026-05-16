@@ -25,8 +25,14 @@ type Customer = {
   id: string;
   name: string;
   company: string;
+  address?: string;
+  state?: string;
+  city?: string;
+  zip?: string;
+  countryCode?: string;
   country: string;
   phone: string;
+  taxId?: string;
   email: string;
   status: 'In Pool' | 'Claimed' | 'Following Up' | 'Negotiating' | 'Closed';
   salesRepId?: string | null;
@@ -149,8 +155,14 @@ export default function App() {
           id: cId,
           name: getVal(row, ['name', '收件人名'], 2) || 'Unknown',
           company: getVal(row, ['company', '买家名称'], 0) || 'Unknown Company',
+          address: getVal(row, ['address', '收货地址'], 1) || '',
+          state: getVal(row, ['state', 'province', '州/省'], 4) || '',
+          city: getVal(row, ['city', '城市'], 5) || '',
+          zip: getVal(row, ['zip', 'postal', '邮编'], 7) || '',
+          countryCode: getVal(row, ['country code', '国家区号'], 9) || '',
+          taxId: getVal(row, ['tax', '税号'], 11) || '',
           country: getVal(row, ['country', 'region', '收货国家'], 3) || 'Unknown Country',
-          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || getVal(row, [], 9) || '',
+          phone: getVal(row, ['phone', 'mobile', '手机', '联系电话'], 10) || '',
           email: getVal(row, ['email', '联系邮箱'], 8) || '',
           status: 'In Pool',
           createdAt: now,
@@ -802,12 +814,45 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium text-muted-foreground mr-2">Email:</span>
-                  <span>{actionState?.lead?.email || 'N/A'}</span>
+                  <span className="truncate" title={actionState?.lead?.email}>{actionState?.lead?.email || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <PhoneCall className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium text-muted-foreground mr-2">Phone:</span>
-                  <span>{actionState?.lead?.phone || 'N/A'}</span>
+                  <span>{actionState?.lead?.countryCode ? `+${actionState?.lead?.countryCode} ` : ''}{actionState?.lead?.phone || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold text-lg border-b pb-2">Delivery Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground mr-2">Address:</span>
+                  <span className="truncate" title={actionState?.lead?.address}>{actionState?.lead?.address || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground mr-2">City:</span>
+                  <span className="truncate" title={actionState?.lead?.city}>{actionState?.lead?.city || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground mr-2">State/Province:</span>
+                  <span className="truncate" title={actionState?.lead?.state}>{actionState?.lead?.state || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-muted-foreground mr-2">Zip/Postal:</span>
+                  <span className="truncate" title={actionState?.lead?.zip}>{actionState?.lead?.zip || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-semibold text-lg border-b pb-2">Company Details</h4>
+              <div className="grid grid-cols-1 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-muted-foreground mr-2">Tax ID:</span>
+                  <span className="truncate" title={actionState?.lead?.taxId}>{actionState?.lead?.taxId || 'N/A'}</span>
                 </div>
               </div>
             </div>

@@ -49,7 +49,13 @@ db.exec(`
     salesRepId TEXT,
     lastFollowUp TEXT,
     createdAt INTEGER,
-    updatedAt INTEGER
+    updatedAt INTEGER,
+    address TEXT,
+    state TEXT,
+    city TEXT,
+    zip TEXT,
+    taxId TEXT,
+    countryCode TEXT
   );
 
   CREATE TABLE IF NOT EXISTS history_logs (
@@ -65,6 +71,14 @@ db.exec(`
     FOREIGN KEY(customerId) REFERENCES customers(id) ON DELETE CASCADE
   );
 `);
+
+// Alter tables if they already exist to add new columns (run silently)
+try { db.exec("ALTER TABLE customers ADD COLUMN address TEXT;"); } catch(e){}
+try { db.exec("ALTER TABLE customers ADD COLUMN state TEXT;"); } catch(e){}
+try { db.exec("ALTER TABLE customers ADD COLUMN city TEXT;"); } catch(e){}
+try { db.exec("ALTER TABLE customers ADD COLUMN zip TEXT;"); } catch(e){}
+try { db.exec("ALTER TABLE customers ADD COLUMN taxId TEXT;"); } catch(e){}
+try { db.exec("ALTER TABLE customers ADD COLUMN countryCode TEXT;"); } catch(e){}
 
 // Simple Admin Bootstrapper
 const adminEmail = 'agqyed01@gmail.com';
@@ -228,14 +242,19 @@ app.post("/api/customers/import", authenticateToken, (req: any, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: "Expected array" });
   try {
     const insert = db.prepare(`
-      INSERT INTO customers (id, name, company, country, phone, email, status, salesRepId, lastFollowUp, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO customers (id, name, company, address, state, city, zip, countryCode, country, phone, taxId, email, status, salesRepId, lastFollowUp, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertMany = db.transaction((customers: any[]) => {
       let inserted = 0;
       for (const cus of customers) {
-        insert.run(cus.id, cus.name, cus.company, cus.country, cus.phone, cus.email, cus.status, cus.salesRepId || null, cus.lastFollowUp || '', cus.createdAt, cus.updatedAt);
+        insert.run(
+          cus.id, cus.name, cus.company, 
+          cus.address || '', cus.state || '', cus.city || '', cus.zip || '', cus.countryCode || '',
+          cus.country, cus.phone, cus.taxId || '', cus.email, 
+          cus.status, cus.salesRepId || null, cus.lastFollowUp || '', cus.createdAt, cus.updatedAt
+        );
         inserted++;
       }
       return inserted;
