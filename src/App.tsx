@@ -795,30 +795,48 @@ export default function App() {
               {actionState?.lead?.company} • {actionState?.lead?.country} • {actionState?.lead?.status}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-auto py-4 pr-1">
-             <h4 className="font-semibold mb-4 text-lg">History Logs</h4>
-             <div className="space-y-4">
-                {historyRecords.length === 0 ? (
-                   <p className="text-muted-foreground text-sm">No history records found.</p>
-                ) : (
-                   historyRecords.map(record => (
-                     <Card key={record.id} className="bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 shadow-none">
-                       <CardContent className="p-4 flex flex-col gap-2">
-                         <div className="flex justify-between items-start">
-                           <div className="flex items-center gap-2">
-                             <Badge variant="outline">
-                               {record.type === 'contact' ? 'Contact' : 'Status Change'}
-                             </Badge>
-                             {record.type === 'contact' && <span className="text-sm font-medium capitalize">{record.contactMethod}</span>}
-                             {record.type === 'status_change' && <span className="text-sm font-medium">{record.oldStatus} → {record.newStatus}</span>}
+          <div className="flex-1 overflow-auto py-4 pr-1 space-y-6">
+            <div className="space-y-3">
+              <h4 className="font-semibold text-lg border-b pb-2">Contact Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-muted-foreground mr-2">Email:</span>
+                  <span>{actionState?.lead?.email || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PhoneCall className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-muted-foreground mr-2">Phone:</span>
+                  <span>{actionState?.lead?.phone || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+             <div>
+               <h4 className="font-semibold mb-4 text-lg border-b pb-2">History Logs</h4>
+               <div className="space-y-4">
+                  {historyRecords.length === 0 ? (
+                     <p className="text-muted-foreground text-sm">No history records found.</p>
+                  ) : (
+                     historyRecords.map(record => (
+                       <Card key={record.id} className="bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 shadow-none">
+                         <CardContent className="p-4 flex flex-col gap-2">
+                           <div className="flex justify-between items-start">
+                             <div className="flex items-center gap-2">
+                               <Badge variant="outline">
+                                 {record.type === 'contact' ? 'Contact' : 'Status Change'}
+                               </Badge>
+                               {record.type === 'contact' && <span className="text-sm font-medium capitalize">{record.contactMethod}</span>}
+                               {record.type === 'status_change' && <span className="text-sm font-medium">{record.oldStatus} → {record.newStatus}</span>}
+                             </div>
+                             <span className="text-xs text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</span>
                            </div>
-                           <span className="text-xs text-muted-foreground">{new Date(record.createdAt).toLocaleString()}</span>
-                         </div>
-                         <p className="text-sm mt-2 whitespace-pre-wrap">{record.note}</p>
-                       </CardContent>
-                     </Card>
-                   ))
-                )}
+                           <p className="text-sm mt-2 whitespace-pre-wrap">{record.note}</p>
+                         </CardContent>
+                       </Card>
+                     ))
+                  )}
+               </div>
              </div>
           </div>
         </DialogContent>
