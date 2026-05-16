@@ -265,14 +265,18 @@ export default function App() {
          lastFollowUp: 'Just now'
       });
       
+      const safePhone = (actionState.lead.phone || '').replace(/[^0-9]/g, '');
+      const safeCountry = (actionState.lead.countryCode || '').replace(/[^0-9]/g, '');
+      const fullPhone = safeCountry ? `${safeCountry}${safePhone}` : safePhone;
+      
       if (actionState.contactMethod === 'whatsapp') {
-         window.open(`https://wa.me/${(actionState.lead.phone || '').replace(/[^0-9]/g, '')}`, '_blank');
+         window.open(`https://wa.me/${fullPhone}`, '_blank');
       } else if (actionState.contactMethod === 'email') {
          window.open(`mailto:${actionState.lead.email}`, '_blank');
       } else if (actionState.contactMethod === 'sms') {
-         window.open(`sms:${(actionState.lead.phone || '').replace(/[^0-9+]/g, '')}`, '_self');
+         window.open(`sms:+${fullPhone}`, '_self');
       } else if (actionState.contactMethod === 'call') {
-         window.open(`tel:${(actionState.lead.phone || '').replace(/[^0-9+]/g, '')}`, '_self');
+         window.open(`tel:+${fullPhone}`, '_self');
       }
       
       setActionState(null);
@@ -774,6 +778,11 @@ export default function App() {
             </DialogTitle>
             <DialogDescription>
               Write down the purpose of this contact. A history record will be permanently saved.
+              {(actionState?.contactMethod === 'whatsapp' || actionState?.contactMethod === 'call' || actionState?.contactMethod === 'sms') && (
+                <div className="mt-2 text-blue-600 font-medium bg-blue-50 p-2 rounded inline-block">
+                  Target Number: +{(actionState.lead?.countryCode || '').replace(/[^0-9]/g, '')}{(actionState.lead?.phone || '').replace(/[^0-9]/g, '')}
+                </div>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
