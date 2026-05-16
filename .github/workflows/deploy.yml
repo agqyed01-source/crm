@@ -52,17 +52,23 @@ jobs:
               exit 1
             fi
             
+            echo "Installing dependencies..."
             npm install --omit=dev
-            # Ensure native modules are built for this architecture
+            
+            echo "Rebuilding better-sqlite3..."
             npm rebuild better-sqlite3 || true
             
-            # Install PM2 globally if not exists, then start/restart the server
-            npm install -g pm2 || true
+            # Install PM2 globally if not exists
+            if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2..."
+              npm install -g pm2 || true
+              export PATH=$PATH:$(npm config get prefix)/bin
+            fi
             
-            # Reload environment for PM2
-            export PATH=$PATH:$(npm config get prefix)/bin
-            
+            echo "Restarting application with PM2..."
             pm2 delete "my-crm-app" || true
             NODE_ENV=production PORT=3002 pm2 start dist/server.cjs --name "my-crm-app" --node-args="--enable-source-maps"
             pm2 save
+            
+            echo "Deployment finished successfully."
 

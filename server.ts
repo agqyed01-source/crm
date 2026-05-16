@@ -4,21 +4,20 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import fs from 'fs';
+import Database from "better-sqlite3";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const SECRET = process.env.JWT_SECRET || "fallback-secret-key-do-not-use-in-prod";
 
 app.use(cors());
 app.use(express.json());
 
 // Initialize SQLite
-let db: any;
+let db: Database.Database;
 try {
   console.log('[DEBUG] Initializing database...');
-  // Interop for different environments/builders
-  const DatabaseConstructor = require("better-sqlite3");
-  db = new DatabaseConstructor('database.sqlite');
+  db = new Database('database.sqlite');
   db.pragma('journal_mode = WAL');
   console.log('[DEBUG] Database initialized successfully.');
 } catch (error: any) {
