@@ -302,6 +302,24 @@ app.delete("/api/customers/:id", authenticateToken, (req: any, res) => {
   }
 });
 
+app.post("/api/customers/bulk-delete", authenticateToken, (req: any, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'Invalid ids' });
+
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'manager') {
+       return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`DELETE FROM customers WHERE id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM customer_history WHERE customerId IN (${placeholders})`).run(...ids);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/customers/:id/history", authenticateToken, (req: any, res) => {
   const { id } = req.params;
   const data = req.body;

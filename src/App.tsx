@@ -91,6 +91,36 @@ export default function App() {
   
   const [countrySearch, setCountrySearch] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+
+  const toggleLeadSelection = (id: string) => {
+    const newSet = new Set(selectedLeads);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedLeads(newSet);
+  };
+
+  const toggleAllLeads = (leads: any[]) => {
+    if (selectedLeads.size === leads.length && leads.length > 0) {
+      setSelectedLeads(new Set());
+    } else {
+      setSelectedLeads(new Set(leads.map(l => l.id)));
+    }
+  };
+
+  const handleBulkDeleteLeads = async () => {
+    if (selectedLeads.size === 0) return;
+    if (!confirm(`Are you sure you want to permanently delete ${selectedLeads.size} selected leads?`)) return;
+    
+    try {
+      await fetchApi(`/api/customers/bulk-delete`, 'POST', { ids: Array.from(selectedLeads) });
+      setSelectedLeads(new Set());
+      setRefreshTrigger(p => p + 1);
+    } catch(e: any) {
+      alert("Error deleting leads: " + e.message);
+    }
+  };
 
   const [actionState, setActionState] = useState<{
     type: 'contact' | 'status' | 'view' | 'edit';
@@ -203,6 +233,7 @@ export default function App() {
       setSelectedFile(null);
       setDashboardImportOpen(false);
       setPoolImportOpen(false);
+      setSelectedLeads(new Set());
       setActiveTab('public-pool');
       setRefreshTrigger(p => p + 1);
     };
@@ -371,23 +402,23 @@ export default function App() {
         
         <div className="p-4 flex flex-col gap-2 flex-grow overflow-y-auto">
           {(role === 'admin' || role === 'manager') && (
-            <Button variant={activeTab === 'dashboard' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => setActiveTab('dashboard')}>
+            <Button variant={activeTab === 'dashboard' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => { setActiveTab('dashboard'); setSelectedLeads(new Set()); }}>
               <LayoutDashboard className="w-4 h-4" /> Dashboard
             </Button>
           )}
           
-          <Button variant={activeTab === 'my-leads' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => setActiveTab('my-leads')}>
+          <Button variant={activeTab === 'my-leads' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => { setActiveTab('my-leads'); setSelectedLeads(new Set()); }}>
             <Users className="w-4 h-4" /> My Customers
             <Badge variant="secondary" className="ml-auto">{myLeads.length}</Badge>
           </Button>
           
-          <Button variant={activeTab === 'public-pool' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => setActiveTab('public-pool')}>
+          <Button variant={activeTab === 'public-pool' ? "secondary" : "ghost"} className="justify-start gap-2" onClick={() => { setActiveTab('public-pool'); setSelectedLeads(new Set()); }}>
             <Building2 className="w-4 h-4" /> Public Pool
             <Badge variant="outline" className="ml-auto">{publicPool.length}</Badge>
           </Button>
           
           {role === 'admin' && (
-            <Button variant={activeTab === 'admin-users' ? "secondary" : "ghost"} className="justify-start gap-2 mt-4" onClick={() => setActiveTab('admin-users')}>
+            <Button variant={activeTab === 'admin-users' ? "secondary" : "ghost"} className="justify-start gap-2 mt-4" onClick={() => { setActiveTab('admin-users'); setSelectedLeads(new Set()); }}>
               <Shield className="w-4 h-4" /> User Management
             </Button>
           )}
@@ -501,11 +532,15 @@ export default function App() {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold tracking-tight">Active Follow-ups</h2>
+                {selectedLeads.size > 0 && <Button variant="destructive" onClick={handleBulkDeleteLeads}><Trash2 className="w-4 h-4 mr-2" /> Delete Selected ({selectedLeads.size})</Button>}
               </div>
               <Card>
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <input type="checkbox" className="rounded" onChange={() => toggleAllLeads(myLeads)} checked={myLeads.length > 0 && selectedLeads.size === myLeads.length} />
+                      </TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Status</TableHead>
@@ -522,6 +557,9 @@ export default function App() {
                       const daysLeft = Math.max(0, CLAIM_PERIOD_DAYS - daysElapsed);
                       return (
                       <TableRow key={lead.id}>
+                        <TableCell>
+                          <input type="checkbox" className="rounded" checked={selectedLeads.has(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
+                        </TableCell>
                         <TableCell>
                           <div className="font-medium cursor-pointer text-blue-600 hover:underline" onClick={() => setActionState({ type: 'view', lead })}>{lead.name}</div>
                           <div className="text-sm text-muted-foreground">{lead.company} | Last: {lead.lastFollowUp || 'N/A'}</div>
@@ -592,6 +630,7 @@ export default function App() {
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold tracking-tight">Available Leads</h2>
                 <div className="flex gap-2">
+                   {selectedLeads.size > 0 && <Button variant="destructive" onClick={handleBulkDeleteLeads}><Trash2 className="w-4 h-4 mr-2" /> Delete Selected ({selectedLeads.size})</Button>}
                    <Input 
                      placeholder="Filter by country..." 
                      className="w-48" 
@@ -723,6 +762,9 @@ export default function App() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-12">
+                            <input type="checkbox" className="rounded" onChange={() => toggleAllLeads(publicPool.filter(c => (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())))} checked={publicPool.filter(c => (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())).length > 0 && selectedLeads.size === publicPool.filter(c => (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())).length} />
+                          </TableHead>
                           <TableHead>Customer</TableHead>
                           <TableHead>Location</TableHead>
                           <TableHead>Status</TableHead>
@@ -732,6 +774,9 @@ export default function App() {
                       <TableBody>
                         {publicPool.filter(c => (c.country || '').toLowerCase().includes(countrySearch.toLowerCase())).map(lead => (
                           <TableRow key={lead.id}>
+                            <TableCell>
+                              <input type="checkbox" className="rounded" checked={selectedLeads.has(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
+                            </TableCell>
                             <TableCell>
                               <div className="font-medium">{lead.name}</div>
                               <div className="text-sm text-muted-foreground">{lead.company} {role === 'admin' ? ` | ${lead.phone}` : ''}</div>
