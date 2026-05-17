@@ -223,12 +223,18 @@ app.put("/api/customers/:id", authenticateToken, (req: any, res) => {
     
     db.prepare(`
       UPDATE customers 
-      SET status = ?, salesRepId = ?, lastFollowUp = ?, updatedAt = ?
+      SET status = ?, salesRepId = ?, lastFollowUp = ?, 
+          name = ?, company = ?, phone = ?, email = ?, countryCode = ?, updatedAt = ?
       WHERE id = ?
     `).run(
       updates.status !== undefined ? updates.status : existing.status,
       updates.salesRepId !== undefined ? updates.salesRepId : existing.salesRepId,
       updates.lastFollowUp !== undefined ? updates.lastFollowUp : existing.lastFollowUp,
+      updates.name !== undefined ? updates.name : existing.name,
+      updates.company !== undefined ? updates.company : existing.company,
+      updates.phone !== undefined ? updates.phone : existing.phone,
+      updates.email !== undefined ? updates.email : existing.email,
+      updates.countryCode !== undefined ? updates.countryCode : existing.countryCode,
       now,
       id
     );
@@ -272,6 +278,25 @@ app.get("/api/customers/:id/history", authenticateToken, (req: any, res) => {
   try {
     const logs = db.prepare('SELECT * FROM history_logs WHERE customerId = ? ORDER BY createdAt DESC').all(req.params.id);
     res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/customers/:id", authenticateToken, (req: any, res) => {
+  const { id } = req.params;
+  try {
+    const existing: any = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    
+    // allow delete if admin/manager or if it belongs to the sales rep
+    if (req.user.role !== 'admin' && req.user.role !== 'manager' && existing.salesRepId !== req.user.uid && existing.status !== 'In Pool') {
+       return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    db.prepare('DELETE FROM customers WHERE id = ?').run(id);
+    db.prepare('DELETE FROM customer_history WHERE customerId = ?').run(id);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

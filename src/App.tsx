@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { 
   Building2, Users, Globe2, MessageCircle, Mail, PhoneCall,
   LogOut, LayoutDashboard, Settings, MoreVertical, Plus, Upload, 
-  FileSpreadsheet, Shield, MessageSquare
+  FileSpreadsheet, Shield, MessageSquare, Pencil, Trash2
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,7 +93,7 @@ export default function App() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   const [actionState, setActionState] = useState<{
-    type: 'contact' | 'status' | 'view';
+    type: 'contact' | 'status' | 'view' | 'edit';
     lead: Customer | null;
     contactMethod?: 'whatsapp' | 'email' | 'sms' | 'call';
   } | null>(null);
@@ -135,14 +135,19 @@ export default function App() {
 
     const processData = async (data: any[]) => {
       const getVal = (row: any, keywords: string[]) => {
-        // Try strict exact match first
-        let key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().trim() === kw.toLowerCase().trim()));
-        // Try substring match if no exact match
-        if (!key) {
-           key = Object.keys(row).find(k => keywords.some(kw => k.toLowerCase().includes(kw.toLowerCase().trim())));
+        let keyStr: string | undefined;
+        for (const kw of keywords) {
+          const found = Object.keys(row).find(k => k.toLowerCase().trim() === kw.toLowerCase().trim());
+          if (found) { keyStr = found; break; }
+        }
+        if (!keyStr) {
+          for (const kw of keywords) {
+            const found = Object.keys(row).find(k => k.toLowerCase().includes(kw.toLowerCase().trim()));
+            if (found) { keyStr = found; break; }
+          }
         }
         
-        let val = key ? row[key] : undefined;
+        let val = keyStr ? row[keyStr] : undefined;
         if (val === undefined || val === null) return '';
         return String(val).replace(/\.0$/, '').trim();
       };
@@ -159,6 +164,18 @@ export default function App() {
         const addr2 = getVal(row, ['地址', 'address2']);
         const fullAddress = [addr1, addr2].filter(Boolean).join(' ');
 
+        const mobile = getVal(row, ['手机', 'mobile']);
+        const tel = getVal(row, ['联系电话', 'phone', '电话']);
+        const code = getVal(row, ['国家区号', 'country code', '区号']);
+
+        let parsedCountryCode = code;
+        let parsedPhone = mobile || tel;
+
+        if (!code && mobile && tel) {
+            parsedCountryCode = tel;
+            parsedPhone = mobile;
+        }
+
         batchCustomers.push({
           id: cId,
           name: getVal(row, ['收件人名称', '收件人名', 'name', '买家名称']) || 'Unknown',
@@ -167,10 +184,10 @@ export default function App() {
           state: getVal(row, ['州/省', 'state', 'province']) || '',
           city: getVal(row, ['城市', 'city']) || '',
           zip: getVal(row, ['邮编', 'zip', 'postal']) || '',
-          countryCode: getVal(row, ['国家区号', 'country code', '区号']) || '',
+          countryCode: parsedCountryCode || '',
           taxId: getVal(row, ['税号', 'tax', 'tax id']) || '',
           country: getVal(row, ['收货国家', '国家', 'country', 'region']) || 'Unknown Country',
-          phone: getVal(row, ['联系电话', '手机', '电话', 'phone', 'mobile']) || '',
+          phone: parsedPhone || '',
           email: getVal(row, ['联系邮件', '邮箱', '邮件', 'email']) || '',
           status: 'In Pool',
           createdAt: now,
@@ -265,9 +282,14 @@ export default function App() {
          lastFollowUp: 'Just now'
       });
       
-      const safePhone = (actionState.lead.phone || '').replace(/[^0-9]/g, '');
+      let safePhone = (actionState.lead.phone || '').replace(/[^0-9]/g, '');
       const safeCountry = (actionState.lead.countryCode || '').replace(/[^0-9]/g, '');
-      const fullPhone = safeCountry ? `${safeCountry}${safePhone}` : safePhone;
+      
+      // If safePhone already starts with safeCountry, don't prepend it again
+      let fullPhone = safePhone;
+      if (safeCountry && !safePhone.startsWith(safeCountry)) {
+         fullPhone = `${safeCountry}${safePhone}`;
+      }
       
       if (actionState.contactMethod === 'whatsapp') {
          window.open(`https://wa.me/${fullPhone}`, '_blank');
@@ -286,6 +308,8 @@ export default function App() {
       alert("Error logging contact: " + e.message);
     }
   };
+
+  const [editLeadData, setEditLeadData] = useState<Partial<Customer>>({});
 
   const handleUpdateStatus = async () => {
     if (!actionState || !actionState.lead || !user) return;
@@ -310,6 +334,29 @@ export default function App() {
       setRefreshTrigger(p => p + 1);
     } catch(e: any) {
       alert("Error updating status: " + e.message);
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    if (!actionState || !actionState.lead) return;
+    try {
+      await fetchApi(`/api/customers/${actionState.lead.id}`, 'PUT', editLeadData);
+      setActionState(null);
+      setEditLeadData({});
+      setRefreshTrigger(p => p + 1);
+    } catch(e: any) {
+      alert("Error updating lead: " + e.message);
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this lead?")) return;
+    try {
+      await fetchApi(`/api/customers/${id}`, 'DELETE');
+      setActionState(null);
+      setRefreshTrigger(p => p + 1);
+    } catch(e: any) {
+      alert("Error deleting lead: " + e.message);
     }
   };
 
@@ -514,6 +561,14 @@ export default function App() {
                                 <DropdownMenuItem onClick={() => setActionState({ type: 'view', lead })}>
                                   View Details
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setEditLeadData(lead); setActionState({ type: 'edit', lead }); }}>
+                                  <Pencil className="w-4 h-4 mr-2" /> Edit Lead
+                                </DropdownMenuItem>
+                                {(role === 'admin' || role === 'manager') && (
+                                  <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => handleDeleteLead(lead.id)}>
+                                    <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
@@ -766,6 +821,40 @@ export default function App() {
       </div>
 
       {/* Dialogs */}
+      <Dialog open={actionState?.type === 'edit'} onOpenChange={(open) => !open && setActionState(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Lead Information</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={editLeadData?.name || ''} onChange={(e) => setEditLeadData({...editLeadData, name: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <Input value={editLeadData?.company || ''} onChange={(e) => setEditLeadData({...editLeadData, company: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Country Code (e.g. 51)</Label>
+              <Input value={editLeadData?.countryCode || ''} onChange={(e) => setEditLeadData({...editLeadData, countryCode: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input value={editLeadData?.phone || ''} onChange={(e) => setEditLeadData({...editLeadData, phone: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={editLeadData?.email || ''} onChange={(e) => setEditLeadData({...editLeadData, email: e.target.value})} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionState(null)}>Cancel</Button>
+            <Button onClick={handleEditSubmit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={actionState?.type === 'contact'} onOpenChange={(open) => !open && setActionState(null)}>
         <DialogContent>
           <DialogHeader>
